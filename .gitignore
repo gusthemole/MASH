@@ -1,0 +1,23 @@
+# Secrets
+/worlds/
+.env
+*.key
+secrets.toml
+
+# Archives and References (Excluding them from the repo)
+/zz_archive/
+/reference_tinymush/
+
+# Python clutter
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# OS clutter
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
