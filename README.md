@@ -192,7 +192,7 @@ In VR, boundaries are suggestions.
 MASH is a spiritual successor and Python reimplementation of the legendary **TinyMUSH** codebase. While no original C code is used, the logic, database structure, and "feel" are heavily inspired by the work of the TinyMUSH development team.
 
 * **Original Project:** [TinyMUSH on GitHub](https://github.com/TinyMUSH/TinyMUSH)
-* **License:** Artistic License 2.0
+* **License:** [Artistic License 2.0](LICENSE)
 * **Primary Authors:** Lydia Leong (Amberyl), David Passmore (Lauren), Robby Griffin (Alierak), Scott Dorr (Myrddin), and Eddy Beaupre (Tyr).
 * **Original Concepts:** Larry Foard (TinyMUSH 1.0) and Jim Aspnes (TinyMUD).
 
