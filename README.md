@@ -1,5 +1,9 @@
 # Multi-Agent Semantic Hallucination (MASH)
 
+![MASH Title Shot](snapshots/Snapshot_20260113_234501.png)
+
+*"The hallucination is a feature, not a bug."*
+
 MASH is a simulator. It is an agent-embodiment and persistence system. It is a game, a storytelling engine, and a generalist tool. Currently in active development, it stands as a beautifully narrative and Turing-complete environment that feels both nostalgic and entirely new.
 
 Designed to be both private and social, MASH supports solitary exploration or multi-user interaction alike. It is novel. It is powerful. The art created through its specialized "snapshot" system is moving and consistently amazing.
