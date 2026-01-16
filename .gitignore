@@ -1,10 +1,18 @@
-# Secrets
-/worlds/
+# Secrets & Local State
 .env
 *.key
 secrets.toml
+world.json
+world.json.tmp
+/worlds/
 
-# Archives and References (Excluding them from the repo)
+# Project Artifacts 
+# (Ignore all snapshots EXCEPT the title shot)
+/snapshots/*
+!/snapshots/Snapshot_20260113_234501.png
+/research_artifacts/
+
+# Archives and References
 /zz_archive/
 /reference_tinymush/
 
