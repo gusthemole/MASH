@@ -295,6 +295,7 @@ class MashEngine:
         self.register_function('date', '[date()]', 'Current date (e.g., Friday, January 10, 2026).')
         self.register_function('time', '[time()]', 'Current time (e.g., 7:45 PM).')
         self.register_function('datetime', '[datetime()]', 'Current date and time.')
+        self.register_function('math', '[math(expr)]', 'Safe evaluation of a math expression (e.g. math(10 * (5+2))).')
         
         # Placeholders
         self.register_placeholder('%n', "Trigger's Name (who caused the action)")
@@ -843,51 +844,75 @@ class MashEngine:
     def _evaluate_functions(self, agent_ref: str, text: str, context_ref: str = None) -> str:
         """
         Evaluate MUSH-style functions [func(args)].
-        Supported: rand(n), pick(list, sep), v(attr), get(target/attr)
-        
-        context_ref: The object being acted upon (e.g. the object being looked at), 
-                    defaults to agent_ref if not provided.
+        Supported: rand(n), pick(list, sep), v(attr), get(target/attr), add, sub, mul, div, math(expr).
         """
         if not text or '[' not in text:
             return text
             
         def replacer(match):
-            content = match.group(1)
+            content = match.group(1).strip()
             if '(' not in content:
                 return f"[{content}]" # Not a function call
             
-            func_name, args_str = content.split('(', 1)
-            func_name = func_name.lower().strip()
-            
-            # Remove ONLY the last closing parenthesis of the function call
-            if args_str.endswith(')'):
-                args_str = args_str[:-1]
-                
-            # Smart split by comma (ignore commas inside nested parens)
-            args = []
-            curr = []
-            depth = 0
-            for c in args_str:
-                if c == ',' and depth == 0:
-                    args.append("".join(curr).strip())
-                    curr = []
-                else:
-                    if c == '(': depth += 1
-                    elif c == ')': depth -= 1
-                    curr.append(c)
-            if curr:
-                args.append("".join(curr).strip())
-                
-            # Recursive evaluation: allows [pick(v(logic))] without inner brackets
-            args = [self._evaluate_functions(agent_ref, f"[{a}]", context_ref) 
-                    if '(' in a and ')' in a and not a.startswith('[') else a for a in args]
-            
-            agent = self.db.get_agent(agent_ref)
-            ctx_obj = self.db.get(context_ref or agent_ref)
-            
             try:
+                # Find the first '(' to separate function name
+                split_idx = content.find('(')
+                if split_idx == -1: return f"[{content}]"
+                
+                func_name = content[:split_idx].lower().strip()
+                args_str = content[split_idx+1:].strip()
+                
+                # Balancing logic: Find the closing paren that matches the first open paren
+                paren_depth = 1
+                closing_idx = -1
+                for i, char in enumerate(args_str):
+                    if char == '(': paren_depth += 1
+                    elif char == ')': paren_depth -= 1
+                    
+                    if paren_depth == 0:
+                        closing_idx = i
+                        break
+                
+                if closing_idx != -1:
+                    # Capture everything before the matching paren
+                    args_inside = args_str[:closing_idx]
+                    # The rest is ignored or part of a larger string
+                    args_str = args_inside
+                elif args_str.endswith(')'):
+                    # Fallback for simple cases if depth check fails
+                    args_str = args_str[:-1]
+                
+                # Smart split by comma (ignore commas inside nested parens)
+                args = []
+                curr = []
+                depth = 0
+                for c in args_str:
+                    if c == ',' and depth == 0:
+                        args.append("".join(curr).strip())
+                        curr = []
+                    else:
+                        if c == '(': depth += 1
+                        elif c == ')': depth -= 1
+                        curr.append(c)
+                if curr:
+                    args.append("".join(curr).strip())
+                
+                # Pre-evaluate arguments recursively (allows nested functions)
+                eval_args = []
+                for a in args:
+                    if '(' in a and ')' in a:
+                         # Wrap and recurse
+                         eval_args.append(self._evaluate_functions(agent_ref, f"[{a}]", context_ref))
+                    else:
+                         eval_args.append(a)
+                
+                args = eval_args
+                agent = self.db.get_agent(agent_ref)
+                ctx_obj = self.db.get(context_ref or agent_ref)
+                
+                # --- FUNCTION DISPATCH ---
                 if func_name == 'rand':
-                    n = int(args[0])
+                    n = int(args[0]) if args[0].isdigit() else 20
                     return str(random.randint(0, n-1)) if n > 0 else "0"
                 elif func_name == 'pick':
                     sep = args[1] if len(args) > 1 else '|'
@@ -902,31 +927,50 @@ class MashEngine:
                         t_ref, t_attr = target_attr.split('/', 1)
                         target = self.match_object(agent_ref, t_ref)
                         if target:
-                            return target.attrs.get(t_attr, "")
+                            return str(target.attrs.get(t_attr, ""))
                     return ""
+                
                 # Math Functions
                 elif func_name == 'add':
-                    return str(float(args[0]) + float(args[1]))
+                    res = float(args[0]) + float(args[1])
+                    return str(int(res)) if res.is_integer() else str(res)
                 elif func_name == 'sub':
-                    return str(float(args[0]) - float(args[1]))
+                    res = float(args[0]) - float(args[1])
+                    return str(int(res)) if res.is_integer() else str(res)
                 elif func_name == 'mul':
-                    return str(float(args[0]) * float(args[1]))
+                    res = float(args[0]) * float(args[1])
+                    return str(int(res)) if res.is_integer() else str(res)
                 elif func_name == 'div':
                     b = float(args[1])
-                    return str(float(args[0]) / b) if b != 0 else "#DIV/0!"
-                # Date/Time Functions
-                elif func_name == 'date':
-                    return datetime.now().strftime('%A, %B %d, %Y')
-                elif func_name == 'time':
-                    return datetime.now().strftime('%I:%M %p').lstrip('0')
-                elif func_name == 'datetime':
+                    if b == 0: return "#DIV/0!"
+                    res = float(args[0]) / b
+                    return str(int(res)) if res.is_integer() else str(res)
+                
+                elif func_name == 'math':
+                    # Safe evaluation of simple math expressions
+                    expr = args[0]
+                    # Sanitize: allow numbers and basic operators
+                    if re.match(r'^[0-9\.\+\-\*\/\(\)\s]+$', expr):
+                        try:
+                            # Use eval carefully on sanitized string
+                            res = eval(expr, {"__builtins__": None}, {})
+                            return str(int(res)) if isinstance(res, (int, float)) and hasattr(res, 'is_integer') and res.is_integer() else str(res)
+                        except:
+                            return "#MATH_ERR!"
+                    return "#NAN!"
+
+                # Date/Time
+                elif func_name in ['date', 'time', 'datetime']:
+                    if func_name == 'date': return datetime.now().strftime('%A, %B %d, %Y')
+                    if func_name == 'time': return datetime.now().strftime('%I:%M %p').lstrip('0')
                     return datetime.now().strftime('%A, %B %d, %Y at %I:%M %p').replace(' 0', ' ')
+
             except Exception:
                 return f"!!{func_name}_err!!"
                 
             return f"[{content}]"
 
-        # Evaluate until no more brackets are left or max depth reached
+        # Safe recursion depth
         for _ in range(5):
             new_text = re.sub(r'\[([^\[\]]+)\]', replacer, text)
             if new_text == text:
@@ -1919,6 +1963,17 @@ Inject logic into actions using `[function()]` syntax.
 - `pick(list)`: Pick a random item from a `|` delimited list.
 - `v(attr)`: Get value of an attribute on the object itself.
 - `get(obj/attr)`: Get attribute value from another object.
+
+**6. Scripting Blocks ({ })**
+You can paste multiple commands or execute complex scripts by wrapping them in Curly Braces `{ }`. Inside a block, commands can be separated by newlines or semicolons `;`.
+- Example: 
+```
+{
+  @create Orb; @describe Orb=A glowing orb.
+  &ROLL Orb=$roll:emit The orb pulses: [rand(100)]
+  look Orb
+}
+```
 """
     
     def _get_topics_help(self) -> str:

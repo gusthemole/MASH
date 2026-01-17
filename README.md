@@ -24,6 +24,15 @@ Install them via:
 pip install -r requirements.txt
 ```
 
+### 🍎 Mac-Specific Notes
+
+If you are running on macOS, you may encounter a few platform-specific security "features":
+
+1. **Permission Errors (`Operation not permitted`)**: If you get a permission error when running Streamlit, macOS is likely blocking the terminal from accessing your `Desktop` or `Documents` folders.
+   * **The Fix**: Go to `System Settings > Privacy & Security > Full Disk Access` and enable it for your **Terminal** (or VS Code). Alternatively, move the MASH folder to your user's home directory (`~`).
+2. **First-Run Onboarding**: The first time you launch, Streamlit will ask for an email address. You can simply hit **Enter** to leave it blank and proceed.
+3. **No CUDA required**: MASH relies on the Gemini Cloud SDK for AI. You do **not** need an NVIDIA GPU or local Torch/CUDA drivers to run the engine.
+
 ## Running MASH
 
 To enter the simulation, run the Streamlit application:
@@ -150,6 +159,20 @@ Softcode allows you to create interactive objects using attributes.
 * `pick(list)`: Pick a random item from a `|` delimited list.
 * `v(attr)`: Get value of an attribute on the object itself.
 * `get(obj/attr)`: Get attribute value from another object.
+
+**6. Scripting Blocks ({ })**
+
+You can paste multiple commands or execute complex scripts by wrapping them in Curly Braces `{ }`. Inside a block, commands can be separated by newlines or semicolons `;`.
+
+* Example:
+
+```mash
+{
+  @create Orb; @describe Orb=A glowing orb.
+  &ROLL Orb=$roll:emit The orb pulses: [rand(100)]
+  look Orb
+}
+```
 
 ## Subjective VR (The Holodeck)
 

@@ -29,3 +29,8 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Tests and Dev Utilities
+test_*.py
+test.py
+*test.py

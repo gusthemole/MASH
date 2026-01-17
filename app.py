@@ -85,7 +85,7 @@ load_dotenv()
 # ─────────────────────────────────────────────────────────────────
 
 # Bump this when mash_engine.py changes to force cache invalidation
-ENGINE_VERSION = 59
+ENGINE_VERSION = 61
 
 
 WORLD_FILE = Path(__file__).parent / "world.json"
@@ -215,7 +215,7 @@ def get_ai_engine(_version):
         return None
 
 @st.cache_resource
-def get_shared_engine(_db, _ai, research_path="research_artifacts", snapshot_path="snapshots"):
+def get_shared_engine(_db, ai_version, _ai, research_path="research_artifacts", snapshot_path="snapshots"):
     """Return the shared engine instance."""
     print(f"[MASH] Creating engine")
     engine = MashEngine(_db, ai_engine=_ai)
@@ -240,6 +240,7 @@ def get_engine():
     snap_path = st.session_state.get("snapshot_path", "snapshots")
     return get_shared_engine(
         get_db(), 
+        ENGINE_VERSION,
         get_ai_engine(ENGINE_VERSION), 
         research_path=res_path,
         snapshot_path=snap_path
@@ -292,34 +293,52 @@ init_session_state()
 # ─────────────────────────────────────────────────────────────────
 
 def parse_input_stream(text):
-    """Parse input into commands, respecting [] as multi-line containers."""
+    """
+    Parse input into commands. 
+    Supports {} as a 'scripting block' container for multiline/multi-command pastes.
+    Standard [] are preserved for MASHcode function evaluation.
+    """
+    if not text:
+        return []
+
     cmds = []
     current = []
-    in_brackets = False
+    in_script_block = False
     
     for char in text:
-        if char == '[' and not in_brackets:
-            in_brackets = True
+        if char == '{' and not in_script_block:
+            in_script_block = True
             continue
-        elif char == ']' and in_brackets:
-            in_brackets = False
+        elif char == '}' and in_script_block:
+            in_script_block = False
+            # Flush on block close
+            if current:
+                block_content = "".join(current).strip()
+                # Split by newline or semicolon inside the block
+                for sub_cmd in re.split(r'[\n;]', block_content):
+                    cleaned = sub_cmd.strip()
+                    if cleaned and not cleaned.startswith('#'):
+                        cmds.append(cleaned)
+                current = []
             continue
-        elif char == '\n':
-            if in_brackets:
-                current.append(char) # Preserve newline
-            else:
-                # Flush
-                if current:
-                    cmds.append("".join(current).strip())
-                    current = []
+        
+        if not in_script_block and char == '\n':
+            # Horizontal flush for single-line commands
+            if current:
+                cleaned = "".join(current).strip()
+                if cleaned and not cleaned.startswith('#'):
+                    cmds.append(cleaned)
+                current = []
         else:
             current.append(char)
     
     # Final flush
     if current:
-        cmds.append("".join(current).strip())
-        
-    return [c for c in cmds if c and not c.startswith('#')]
+        cleaned = "".join(current).strip()
+        if cleaned and not cleaned.startswith('#'):
+            cmds.append(cleaned)
+            
+    return cmds
 
 def hash_password(password: str) -> str:
     """Simple password hashing. NOT secure for production!"""
