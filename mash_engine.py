@@ -1808,8 +1808,6 @@ class MashEngine:
         if recipient.dbref not in self.db._location_index:
             self.db._location_index[recipient.dbref] = []
         self.db._location_index[recipient.dbref].append(item.dbref)
-
-        self.db.save(WORLD_FILE)
         
         return CommandResult(True, f"You gave {item.name} to {recipient.name}.", 
                              message_3p=f"{agent.name} gave {item.name} to {recipient.name}.")

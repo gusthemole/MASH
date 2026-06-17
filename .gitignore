@@ -15,6 +15,7 @@ world.json.tmp
 # Archives and References
 /zz_archive/
 /reference_tinymush/
+mash_mcp_architecture.md
 
 # Python clutter
 __pycache__/
