@@ -47,7 +47,7 @@ class AIEngine:
             "- [exit]: Leave the current vehicle or container.\n"
             "- [get <obj>]: Pick up an object.\n"
             "- [drop <obj>]: Drop an object.\n"
-            "- [wear <description>]: Instantly change your outfit/description (e.g., [wear a neon tuxedo]).\n"
+            "- [wear <1-10|name|description>]: Change your outfit to a pre-defined slot, an outfit name, or a new description (e.g., [wear 2] or [wear casual] or [wear a neon tuxedo]).\n- [outfit define <1-10>=<description>]: Save a description to an outfit slot.\n- [outfit rename <1-10>=<name>]: Rename an outfit slot.\n"
             "- [look <obj>]: Inspect an object. (DO NOT use 'look around').\n"
             "- [reset]: Use this command ONLY if the user asks to reset the simulation.\n"
             "- [deep_research <topic>]: Start a Deep Research background job (Async/Slow). Use for complex questions.\n"
@@ -138,6 +138,9 @@ class AIEngine:
         
         can_exit = room.get('can_exit', False)
 
+        outfits = context.get('outfits', [])
+        outfit_list = ", ".join([f"{o['slot']}: '{o['name']}'" for o in outfits]) if outfits else "None"
+
         prompt = [
             self.system_prompt,
             f"CURRENT TIME: {datetime.now().strftime('%A, %B %d, %Y at %I:%M %p')}",
@@ -149,6 +152,7 @@ class AIEngine:
             f"INSIDE A VEHICLE? {'Yes (Use [exit] to leave)' if can_exit else 'No'}",
             f"PERSISTENT FACTS (MEMO): {memo if memo else 'No persistent memories.'}",
             f"CURRENT INTENT (UPSUM/STATUS): {status if status else 'No active goals.'}",
+            f"AVAILABLE PRE-DEFINED OUTFITS (Use [wear <slot_number>] or [wear <name>]): {outfit_list}",
             f"TRIGGER ACTION: {last_action}",
             "\nROOM HISTORY (CONTEXT):",
         ]
@@ -270,6 +274,9 @@ class AIEngine:
         
         can_exit = room.get('can_exit', False)
         
+        outfits = robot_context.get('outfits', [])
+        outfit_list = ", ".join([f"{o['slot']}: '{o['name']}'" for o in outfits]) if outfits else "None"
+        
         prompt = [
             self.system_prompt,
             f"CURRENT TIME: {datetime.now().strftime('%A, %B %d, %Y at %I:%M %p')}",
@@ -281,6 +288,7 @@ class AIEngine:
             f"INSIDE A VEHICLE? {'Yes (Use [exit] to leave)' if can_exit else 'No'}",
             f"PERSISTENT FACTS (MEMO): {memo if memo else 'No persistent memories.'}",
             f"CURRENT INTENT (UPSUM/STATUS): {status if status else 'No active goals.'}",
+            f"AVAILABLE PRE-DEFINED OUTFITS (Use [wear <slot_number>] or [wear <name>]): {outfit_list}",
             "\nROOM HISTORY (LAST 10 TURNS):",
         ]
         

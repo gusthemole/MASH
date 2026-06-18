@@ -765,20 +765,40 @@ def render_outfit_manager(player_ref: str, mode: str = "all"):
 
     st.divider()
     
-    # 2. Slot Selection (Submenu)
-    # Use columns or pills if available? Stick to selectbox / radio for reliability.
-    # Radio is nice for 10 items? Might take space. Selectbox is compact.
-    # Let's try a horizontal radio if it fits, or just selectbox.
-    # "Select Slot"
+    # Base Physical / Body Description Section
+    body_desc = target.attrs.get("body_desc", "").strip()
+    with st.expander("👤 Base Physical / Body Description", expanded=not body_desc):
+        st.markdown(
+            "This description represents the agent's core identity (e.g. face, hair, body features). "
+            "It is automatically combined with any outfit they wear."
+        )
+        with st.form(key=f"base_desc_form_{target.dbref}_{mode}"):
+            new_body = st.text_area(
+                "Base Description", 
+                value=body_desc if body_desc else target.desc, 
+                height=100,
+                help="Describe face, hair, and body features. Omit clothing."
+            )
+            if st.form_submit_button("💾 Save Base Description"):
+                target_prefix = "" if target == player else f"{target.name} "
+                clean_body = new_body.replace("\n", " ").strip()
+                cmd = f"@outfit body {target_prefix}{clean_body}"
+                execute_sidebar_cmd(cmd)
+
+    st.divider()
     
-    # Create labels for slots (show emptiness?)
+    # 2. Slot Selection (Submenu)
+    # Create labels for slots (show custom names if defined)
     slot_labels = {}
     for i in range(1, 11):
         key = f"outfit_{i}"
+        name_key = f"outfit_name_{i}"
+        custom_name = target.attrs.get(name_key, "").strip()
+        slot_label = custom_name if custom_name else f"Slot {i}"
         has_desc = bool(target.attrs.get(key))
         # Icon: 👕 if filled, ⚪ if empty
         ico = "👕" if has_desc else "⚪"
-        slot_labels[i] = f"{ico} Slot {i}"
+        slot_labels[i] = f"{ico} {slot_label}"
         
     slot_id = st.selectbox(
         "Select Slot", 
@@ -789,11 +809,14 @@ def render_outfit_manager(player_ref: str, mode: str = "all"):
     
     # 3. Slot Interface
     slot_key = f"outfit_{slot_id}"
+    name_key = f"outfit_name_{slot_id}"
     current_desc = target.attrs.get(slot_key, "")
+    current_name = target.attrs.get(name_key, "")
     
     # Preview Frame
     if current_desc:
-        st.success(f"**Current Look:**\n\n{current_desc}")
+        display_title = current_name if current_name else f"Slot {slot_id}"
+        st.success(f"**Current Look ({display_title}):**\n\n{current_desc}")
         if st.button(f"✨ Wear This Outfit", key=f"btn_wear_{target.dbref}_{slot_id}", use_container_width=True):
              cmd = f"@wear {slot_id}"
              if target != player:
@@ -805,19 +828,25 @@ def render_outfit_manager(player_ref: str, mode: str = "all"):
     st.markdown("---")
     
     # Edit Form
-    with st.expander("✏️ Edit Description", expanded=not current_desc):
+    with st.expander("✏️ Edit Outfit", expanded=not current_desc):
         # Unique key including slot
         form_key = f"edit_form_{target.dbref}_{slot_id}"
         with st.form(key=form_key):
+             new_name = st.text_input("Outfit Name", value=current_name, placeholder=f"Slot {slot_id}")
              new_desc = st.text_area("Description", value=current_desc, height=120)
-             if st.form_submit_button("💾 Save to Slot"):
-                 safe_desc = new_desc.replace("\n", " ")
-                 cmd = f"@outfit define {slot_id}={safe_desc}"
-                 if target != player:
-                      cmd = f"@outfit define {target.name} {slot_id}={safe_desc}"
-                 execute_sidebar_cmd(cmd)
-
-
+             if st.form_submit_button("💾 Save Outfit"):
+                 cmds = []
+                 target_prefix = "" if target == player else f"{target.name} "
+                 
+                 # 1. Save Name
+                 safe_name = new_name.strip()
+                 cmds.append(f"@outfit rename {target_prefix}{slot_id}={safe_name}")
+                 
+                 # 2. Save Description
+                 safe_desc = new_desc.replace("\n", " ").strip()
+                 cmds.append(f"@outfit define {target_prefix}{slot_id}={safe_desc}")
+                 
+                 execute_sidebar_cmd("\n".join(cmds))
 
 
 def render_construction_menu(player_ref: str):

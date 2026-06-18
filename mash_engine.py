@@ -226,10 +226,10 @@ class MashEngine:
             aliases=['summon'], category='Movement', usage='@summon <agent>', help='Summon a willing agent to your location')
             
         # Outfits
-        self.register_command('@outfit', self._cmd_outfit,
-            category='System', usage='@outfit define <1-10>=<desc> | list', help='Manage outfits')
-        self.register_command('@wear', self._cmd_wear,
-            category='System', usage='@wear <1-10>', help='Wear a defined outfit')
+        self.register_command('@outfit', self._cmd_outfit, aliases=['outfit'],
+            category='System', usage='@outfit define <1-10>=<desc> | list | rename <1-10>=<name>', help='Manage outfits')
+        self.register_command('@wear', self._cmd_wear, aliases=['wear'],
+            category='System', usage='@wear <1-10|name|description>', help='Wear a defined outfit')
 
         # Deep Research Command
         self.register_command('@deep_research', self._cmd_deep_research,
@@ -2547,6 +2547,20 @@ You can paste multiple commands or execute complex scripts by wrapping them in C
                  # Detect if we can exit (inside a container)
                  room_ctx['can_exit'] = (room_obj.type != 'room')
 
+        # Collect available outfits for target if it is an agent
+        outfits = []
+        if target.type == 'agent':
+            for i in range(1, 11):
+                attr_name = f"outfit_{i}"
+                if attr_name in target.attrs:
+                    name_key = f"outfit_name_{i}"
+                    slot_name = target.attrs.get(name_key, f"Slot {i}")
+                    outfits.append({
+                        'slot': i,
+                        'name': slot_name,
+                        'desc': target.attrs[attr_name]
+                    })
+
         return {
             'action': action,
             'actor': agent.to_dict(),
@@ -2555,7 +2569,8 @@ You can paste multiple commands or execute complex scripts by wrapping them in C
             'memo': getattr(target, 'memo', ''),
             'status': getattr(target, 'status', ''),
             'history': self.get_history(10, location_ref=agent.location),
-            'room_context': room_ctx
+            'room_context': room_ctx,
+            'outfits': outfits
         }
         
     def capture_robot_intent(self, robot_ref: str, ai_output: str) -> List[CommandResult]:
@@ -3124,6 +3139,8 @@ You can paste multiple commands or execute complex scripts by wrapping them in C
         desc = desc.replace('\\n', '\n').replace('\\t', '\t')
         
         target.desc = desc
+        if target.type == 'agent':
+            target.attrs["body_desc"] = desc
 
         return CommandResult(
             True, 
@@ -4044,13 +4061,14 @@ You can paste multiple commands or execute complex scripts by wrapping them in C
         Syntax: 
           @outfit list [target]
           @outfit define [target] <1-10>=<desc>
+          @outfit rename [target] <1-10>=<name>
         """
         agent = self.db.get_agent(agent_ref)
         if not agent: return CommandResult(False, "You don't exist!")
         
         args = args.strip()
         if not args:
-            return CommandResult(False, "Usage: `@outfit define [target] <1-10>=<desc>` or `@outfit list [target]`")
+            return CommandResult(False, "Usage: `@outfit define [target] <1-10>=<desc>`, `@outfit rename [target] <1-10>=<name>`, or `@outfit list [target]`")
             
         parts = args.split(None, 1)
         subcmd = parts[0].lower()
@@ -4072,7 +4090,7 @@ You can paste multiple commands or execute complex scripts by wrapping them in C
             elif '=' in first_word and first_word.split('=')[0].isdigit():
                  is_slot = True
             
-            if not is_slot and subcmd == 'define':
+            if not is_slot and subcmd in ['define', 'rename']:
                 # Try to match target
                 # We need to split subargs: "Target Name 1=Desc" -> "Target Name", "1=Desc"
                 # This is tricky because names can have spaces.
@@ -4100,23 +4118,76 @@ You can paste multiple commands or execute complex scripts by wrapping them in C
         # Permission Check
         if target != agent and not self.can_modify(agent_ref, target):
              return CommandResult(False, f"You don't own **{target.name}**.")
-
+ 
         # Logic
         if subcmd == 'list':
             lines = [f"**Wardrobe for {target.name}:**"]
+            body_desc = target.attrs.get("body_desc", "").strip()
+            if body_desc:
+                lines.append(f"  **Base Body Description:** {body_desc}")
+            else:
+                lines.append(f"  **Base Body Description:** (Not set, using full description)")
+                
             found_outfit = False
             for i in range(1, 11):
                 attr_name = f"outfit_{i}"
                 if attr_name in target.attrs:
                     desc = target.attrs[attr_name]
+                    name_key = f"outfit_name_{i}"
+                    slot_name = target.attrs.get(name_key, f"Slot {i}")
                     preview = (desc[:50] + '...') if len(desc) > 50 else desc
-                    lines.append(f"  **{i}:** {preview}")
+                    lines.append(f"  **{i} ({slot_name}):** {preview}")
                     found_outfit = True
             if not found_outfit:
                  lines.append("  (Empty)")
             
             return CommandResult(True, "\n".join(lines))
             
+        elif subcmd in ['body', 'base']:
+             # Parse body desc
+             # Look for target name prefix in cmd_args (subargs)
+             owned_agents = []
+             for obj in self.db.objects.values():
+                 if obj.type == 'agent' and getattr(obj, 'owner', '') == agent_ref and obj.dbref != agent_ref:
+                     owned_agents.append(obj)
+             owned_agents.sort(key=lambda x: len(x.name), reverse=True)
+             
+             target = agent
+             body_text = subargs
+             
+             for pot_target in owned_agents:
+                 pt_name = pot_target.name.lower()
+                 subargs_lower = subargs.lower()
+                 if subargs_lower.startswith(pt_name + " "):
+                     target = pot_target
+                     body_text = subargs[len(pt_name)+1:].strip()
+                     break
+                     
+             if not body_text.strip():
+                 return CommandResult(False, "Usage: `@outfit body [target] <description>`")
+                 
+             # Permission Check again on actual target if it changed
+             if target != agent and not self.can_modify(agent_ref, target):
+                  return CommandResult(False, f"You don't own **{target.name}**.")
+                  
+             target.attrs["body_desc"] = body_text.strip()
+             
+             # Refresh active desc if clothing is currently worn
+             active_outfit = target.attrs.get("active_outfit_desc", "").strip()
+             if active_outfit:
+                 body_desc = target.attrs["body_desc"]
+                 if not body_desc.endswith('.') and not body_desc.endswith('!') and not body_desc.endswith('?'):
+                     body_desc += '.'
+                 
+                 if body_desc.lower() in active_outfit.lower() or active_outfit.lower().startswith(body_desc.lower()[:30]):
+                     target.desc = active_outfit
+                 else:
+                     target.desc = f"{body_desc} {active_outfit}"
+             else:
+                 target.desc = target.attrs["body_desc"]
+                 
+             return CommandResult(True, f"Base body description updated for **{target.name}**.")
+             
         elif subcmd == 'define':
              if '=' not in cmd_args:
                  return CommandResult(False, "Usage: `@outfit define [target] <n>=<description>`")
@@ -4132,7 +4203,22 @@ You can paste multiple commands or execute complex scripts by wrapping them in C
              target.attrs[f"outfit_{slot}"] = desc.strip()
              return CommandResult(True, f"Outfit {slot} defined for **{target.name}**.")
              
-        return CommandResult(False, "Unknown subcommand.")
+        elif subcmd == 'rename':
+             if '=' not in cmd_args:
+                 return CommandResult(False, "Usage: `@outfit rename [target] <n>=<name>`")
+             
+             slot_str, name = cmd_args.split('=', 1)
+             try:
+                 slot = int(slot_str.strip())
+                 if not (1 <= slot <= 10):
+                     raise ValueError
+             except ValueError:
+                 return CommandResult(False, "Slot must be a number between 1 and 10.")
+                 
+             target.attrs[f"outfit_name_{slot}"] = name.strip()
+             return CommandResult(True, f"Outfit {slot} renamed to **{name.strip()}** for **{target.name}**.")
+             
+        return CommandResult(False, "Unknown subcommand. Expected `define`, `rename`, `list`, or `body`.")
 
     def _cmd_wear(self, agent_ref: str, args: str) -> CommandResult:
         """
@@ -4195,13 +4281,24 @@ You can paste multiple commands or execute complex scripts by wrapping them in C
         except ValueError:
             pass
             
+        # Try matching by name if not slot number
+        if not slot:
+            for i in range(1, 11):
+                name_key = f"outfit_name_{i}"
+                custom_name = target.attrs.get(name_key, "")
+                if custom_name.strip().lower() == wear_arg.lower():
+                    slot = i
+                    break
+            
         if slot:
             # SLOT MODE
             attr_name = f"outfit_{slot}"
             if attr_name not in target.attrs:
-                return CommandResult(False, f"Outfit {slot} is not defined for **{target.name}**.")
+                return CommandResult(False, f"Outfit '{wear_arg}' (Slot {slot}) is not defined for **{target.name}**.")
             description = target.attrs[attr_name]
-            msg = f"**{target.name}** is now wearing Outfit {slot}."
+            name_key = f"outfit_name_{slot}"
+            slot_name = target.attrs.get(name_key, f"Slot {slot}")
+            msg = f"**{target.name}** is now wearing Outfit '{slot_name}' (Slot {slot})."
         else:
             # MAGIC WEAR MODE (String)
             # Slot 11 is the "Magic Slot" (Infinite Closet)
@@ -4216,14 +4313,32 @@ You can paste multiple commands or execute complex scripts by wrapping them in C
         if not description:
              return CommandResult(False, "Outfit description is empty.")
              
-        target.desc = description
+        # Track active clothing/outfit
+        target.attrs["active_outfit_desc"] = description
+        target.attrs["active_outfit_slot"] = str(slot)
+        
+        # Merge with body_desc if present
+        body_desc = target.attrs.get("body_desc", "").strip()
+        if body_desc:
+            # Clean spacing/period
+            if not body_desc.endswith('.') and not body_desc.endswith('!') and not body_desc.endswith('?'):
+                body_desc += '.'
+            
+            clean_clothing = description.strip()
+            # Avoid double-prefixing if clothing desc already contains the body_desc
+            if body_desc.lower() in clean_clothing.lower() or clean_clothing.lower().startswith(body_desc.lower()[:30]):
+                target.desc = clean_clothing
+            else:
+                target.desc = f"{body_desc} {clean_clothing}"
+        else:
+            target.desc = description
         
         self.db.room_announce(target.location, f"🌐\n**{target.name}** changes their outfit.")
         
         return CommandResult(
             True, 
             msg,
-            context={'action': 'wear', 'desc': description}
+            context={'action': 'wear', 'desc': target.desc}
         )
 
     def _cmd_reset_vr(self, agent_ref: str, args: str) -> CommandResult:

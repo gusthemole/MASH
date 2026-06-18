@@ -97,6 +97,39 @@ class GameObject:
         return {k: v for k, v in data.items() if v or k == 'type'}
 
 
+def split_description(desc: str) -> tuple[str, str]:
+    desc = desc.strip()
+    if not desc:
+        return "", ""
+        
+    markers = [
+        " she wears", " she is wearing", " she's wearing", " she's currently wearing",
+        " he wears", " he is wearing", " he's wearing", " he's currently wearing",
+        " they wear", " they are wearing", " they're wearing",
+        " wearing ", " relaxing in", " has traded "
+    ]
+    
+    desc_lower = desc.lower()
+    best_idx = -1
+    
+    for marker in markers:
+        idx = desc_lower.find(marker)
+        if idx != -1:
+            if best_idx == -1 or idx < best_idx:
+                best_idx = idx
+                
+    if best_idx != -1:
+        body = desc[:best_idx].strip()
+        clothing = desc[best_idx:].strip()
+        if body:
+            # Capitalize clothing first letter if it starts with a letter
+            if clothing and clothing[0].islower():
+                clothing = clothing[0].upper() + clothing[1:]
+            return body, clothing
+            
+    return desc, ""
+
+
 class WorldDatabase:
     """
     Manages the game world state.
@@ -170,7 +203,19 @@ class WorldDatabase:
                     self.objects[dbref] = GameObject(dbref=dbref, **filtered_data)
                     
             self.rebuild_indices()
+            self._migrate_agent_descriptions()
     
+    def _migrate_agent_descriptions(self):
+        """Automatically initialize body_desc and active_outfit_desc if not present for agents."""
+        for obj in self.objects.values():
+            if obj.type == 'agent':
+                if 'body_desc' not in obj.attrs:
+                    body, clothing = split_description(obj.desc)
+                    if body:
+                        obj.attrs['body_desc'] = body
+                    if clothing and 'active_outfit_desc' not in obj.attrs:
+                        obj.attrs['active_outfit_desc'] = clothing
+
     def save(self, path: Path) -> None:
         """Save world to JSON file atomically."""
         with self._lock:
