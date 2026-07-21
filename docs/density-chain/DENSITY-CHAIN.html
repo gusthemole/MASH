@@ -1,0 +1,410 @@
+<title>MASH Density-Trellis</title>
+<style>
+  :root{
+    --bg:#f5f4fb; --panel:#ffffff; --panel-2:#efedf9; --ink:#1a1930; --ink-soft:#4d4a66;
+    --line:#e2def0; --line-2:#cfc9e6; --brand:#6b5ed0;
+    --t1:#3f7fe0; --t2:#7280ec; --t3:#9b8cf7; --t4:#c579e4; --t5:#e46fc4;
+    --ok:#177f68; --ok-bg:#d8f0e9; --hold:#95701c; --hold-bg:#f3e9cf; --wip:#bd524f; --wip-bg:#f5dedd;
+    --shadow:0 1px 2px rgba(30,20,60,.06),0 10px 30px rgba(40,26,80,.06);
+    --band:#141634; --band-2:#2a1b40;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0d0e1b; --panel:#161a2e; --panel-2:#1c2038; --ink:#e9e9f6; --ink-soft:#a6a4c6;
+      --line:#282c47; --line-2:#3a3e60; --brand:#9b8cf7;
+      --t1:#58a6ff; --t2:#8093fb; --t3:#a794f8; --t4:#cd83e6; --t5:#ef6fd0;
+      --ok:#54ccac; --ok-bg:#123027; --hold:#dcb46b; --hold-bg:#312a19; --wip:#ec8d84; --wip-bg:#33211f;
+      --shadow:0 1px 2px rgba(0,0,0,.35),0 12px 34px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#f5f4fb; --panel:#ffffff; --panel-2:#efedf9; --ink:#1a1930; --ink-soft:#4d4a66;
+    --line:#e2def0; --line-2:#cfc9e6; --brand:#6b5ed0;
+    --t1:#3f7fe0; --t2:#7280ec; --t3:#9b8cf7; --t4:#c579e4; --t5:#e46fc4;
+    --ok:#177f68; --ok-bg:#d8f0e9; --hold:#95701c; --hold-bg:#f3e9cf; --wip:#bd524f; --wip-bg:#f5dedd;
+  }
+  :root[data-theme="dark"]{
+    --bg:#0d0e1b; --panel:#161a2e; --panel-2:#1c2038; --ink:#e9e9f6; --ink-soft:#a6a4c6;
+    --line:#282c47; --line-2:#3a3e60; --brand:#9b8cf7;
+    --t1:#58a6ff; --t2:#8093fb; --t3:#a794f8; --t4:#cd83e6; --t5:#ef6fd0;
+    --ok:#54ccac; --ok-bg:#123027; --hold:#dcb46b; --hold-bg:#312a19; --wip:#ec8d84; --wip-bg:#33211f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    line-height:1.5;-webkit-font-smoothing:antialiased}
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace}
+  .wrap{max-width:1120px;margin:0 auto;padding:clamp(16px,3vw,34px) clamp(14px,4vw,40px) 72px}
+
+  /* ===== animated SVG banner (theme-neutral) ===== */
+  .banner{border-radius:16px;overflow:hidden;box-shadow:var(--shadow);border:1px solid var(--line);
+    margin-bottom:26px;background:#131530;display:block}
+  .banner svg{display:block;width:100%;height:auto}
+  .node{transform-box:fill-box;transform-origin:center;animation:pulse 3.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.28}50%{opacity:1}}
+  .sweep{animation:sweep 7s linear infinite}
+  @keyframes sweep{from{transform:translateX(-320px)}to{transform:translateX(1240px)}}
+  .grow{stroke-dasharray:200;stroke-dashoffset:200;animation:grow 2.4s ease-out forwards}
+  @keyframes grow{to{stroke-dashoffset:0}}
+
+  /* header text under banner */
+  .lede{font-size:clamp(15px,1.7vw,18px);color:var(--ink-soft);max-width:66ch;margin:0 0 20px}
+  .lede b{color:var(--ink);font-weight:600}
+  .stats{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 13px;
+    display:flex;gap:9px;align-items:baseline;box-shadow:var(--shadow)}
+  .stat b{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:16px;font-weight:700;
+    font-variant-numeric:tabular-nums;color:var(--brand)}
+  .stat span{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.06em}
+
+  .trunk{margin:26px 0 8px;background:linear-gradient(180deg,var(--panel),var(--panel-2));
+    border:1px solid var(--line);border-left:3px solid var(--t2);border-radius:12px;
+    padding:18px 22px;box-shadow:var(--shadow)}
+  .trunk .k{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--brand);margin:0 0 8px}
+  .trunk p{margin:0;font-size:15.5px;max-width:82ch}
+  .trunk b{color:var(--brand)}
+
+  .thesis{margin:14px 0 8px;border:1px solid color-mix(in srgb,var(--brand) 26%,var(--line));border-radius:12px;
+    padding:16px 20px;box-shadow:var(--shadow);
+    background:linear-gradient(180deg,color-mix(in srgb,var(--brand) 8%,var(--panel)),var(--panel))}
+  .thesis .tag{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--brand);display:block;margin-bottom:11px}
+  .thesis ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:9px}
+  .thesis li{font-size:13.5px;line-height:1.5}
+  .thesis li b{color:var(--ink)}
+  .thesis .tone{display:inline-block;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:9.5px;
+    letter-spacing:.03em;padding:1px 7px;border-radius:20px;margin-left:2px;white-space:nowrap;vertical-align:middle}
+  .thesis .tone.ok{color:var(--ok);background:var(--ok-bg)}
+  .thesis .tone.hold{color:var(--hold);background:var(--hold-bg)}
+  .thesis .tone.wip{color:var(--wip);background:var(--wip-bg)}
+  .thesis-tl{margin:13px 0 0;font-size:14.5px;font-weight:500}
+  .thesis-tl b{color:var(--brand)}
+
+  .legend{display:flex;flex-wrap:wrap;gap:22px;align-items:center;margin:24px 0 6px;
+    padding:14px 18px;background:var(--panel);border:1px solid var(--line);border-radius:11px}
+  .legend h4{margin:0 0 6px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);
+    font-family:ui-monospace,Menlo,Consolas,monospace}
+  .ramp{display:flex;align-items:center;gap:0}
+  .ramp i{width:26px;height:14px;display:block}
+  .ramp i:first-child{border-radius:4px 0 0 4px}.ramp i:last-child{border-radius:0 4px 4px 0}
+  .ramp-lab{display:flex;justify-content:space-between;width:130px;font-size:10.5px;color:var(--ink-soft);
+    margin-top:3px;font-family:ui-monospace,Menlo,Consolas,monospace}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;padding:2px 8px;border-radius:20px;
+    font-weight:600;letter-spacing:.02em;white-space:nowrap;border:1px solid transparent}
+  .chip.ok{color:var(--ok);background:var(--ok-bg);border-color:color-mix(in srgb,var(--ok) 30%,transparent)}
+  .chip.hold{color:var(--hold);background:var(--hold-bg);border-color:color-mix(in srgb,var(--hold) 34%,transparent)}
+  .chip.wip{color:var(--wip);background:var(--wip-bg);border-color:color-mix(in srgb,var(--wip) 34%,transparent)}
+
+  .group{margin-top:38px}
+  .group-hd{display:flex;align-items:baseline;gap:14px;margin:0 0 4px;flex-wrap:wrap}
+  .group-hd .n{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--brand);
+    letter-spacing:.14em;text-transform:uppercase}
+  .group-hd h2{font-size:20px;margin:0;font-weight:700;letter-spacing:-.01em}
+  .group-hd .sub{color:var(--ink-soft);font-size:13.5px}
+
+  .branch{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:18px 20px 8px;box-shadow:var(--shadow)}
+  .branch-hd{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px}
+  .badge{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;font-size:13px;color:#fff;
+    border-radius:8px;padding:5px 9px;flex:none;letter-spacing:.02em;
+    background:linear-gradient(135deg,var(--t2),var(--t4))}
+  .branch-hd .tt{flex:1;min-width:220px}
+  .branch-hd h3{margin:0;font-size:17.5px;font-weight:700;letter-spacing:-.01em}
+  .branch-hd .charter{margin:3px 0 0;color:var(--ink-soft);font-size:13.5px;max-width:78ch}
+
+  .note{margin:0 0 14px;padding:11px 14px;border-radius:10px;font-size:13px;line-height:1.55;
+    background:color-mix(in srgb,var(--brand) 9%,var(--panel));
+    border:1px solid color-mix(in srgb,var(--brand) 26%,transparent);border-left:3px solid var(--brand)}
+  .note b{color:var(--brand)}
+  .note .tag{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--brand);display:block;margin-bottom:4px}
+
+  .lattice{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;position:relative}
+  .vine{position:absolute;top:26px;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,var(--t1),var(--t2),var(--t3),var(--t4),var(--t5));
+    opacity:.34;z-index:0}
+  .cell{position:relative;z-index:1;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:10px;padding:0;text-align:left;cursor:pointer;overflow:hidden;
+    font:inherit;color:inherit;display:flex;flex-direction:column;transition:border-color .15s,transform .12s}
+  .cell:hover{border-color:var(--line-2);transform:translateY(-1px)}
+  .cell:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+  .cell .stripe{height:5px;flex:none}
+  .cell .top{display:flex;align-items:center;gap:7px;padding:9px 10px 6px}
+  .cell .tno{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;font-weight:700}
+  .cell .phase{font-size:9.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.07em;
+    font-family:ui-monospace,Menlo,Consolas,monospace;margin-left:auto}
+  .cell .gist{padding:0 10px 10px;font-size:12.5px;color:var(--ink);line-height:1.42}
+  .cell .st{margin:2px 10px 11px}
+
+  .xl{border-top:1px dashed var(--line);margin-top:14px;padding:11px 2px 12px;font-size:12.5px;color:var(--ink-soft)}
+  .xl b{color:var(--brand);font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:600;font-size:11.5px}
+
+  .sheet{position:fixed;inset:0;background:rgba(10,10,24,.55);backdrop-filter:blur(3px);
+    display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
+  .sheet.on{display:flex}
+  .sheet-card{background:var(--panel);border:1px solid var(--line-2);border-radius:16px;max-width:640px;width:100%;
+    max-height:84vh;overflow:auto;box-shadow:0 24px 70px rgba(0,0,0,.45);padding:24px 26px}
+  .sheet-card .sh-top{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .sheet-card h3{margin:0;font-size:15px;font-weight:700}
+  .sheet-card .cls{font-size:12px;color:var(--ink-soft);font-family:ui-monospace,Menlo,Consolas,monospace}
+  .sheet-card .full{margin:14px 0 0;font-size:14.5px;line-height:1.62}
+  .sheet-card .meta{margin-top:16px;padding-top:13px;border-top:1px solid var(--line);
+    font-size:12px;color:var(--ink-soft);font-family:ui-monospace,Menlo,Consolas,monospace}
+  .x{margin-left:auto;background:none;border:1px solid var(--line);border-radius:8px;color:var(--ink);
+    width:30px;height:30px;cursor:pointer;font-size:16px;line-height:1;flex:none}
+  .x:hover{border-color:var(--line-2)}
+
+  footer{margin-top:52px;padding-top:24px;border-top:1px solid var(--line);color:var(--ink-soft);font-size:13px}
+  footer b{color:var(--ink)}
+  footer .mono{font-size:12px}
+  @media(max-width:720px){.lattice{grid-template-columns:1fr}.vine{display:none}.cell .gist{display:block}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+  <div class="banner" role="img" aria-label="Trellis Density-Trellis — animated lattice banner">
+    <svg viewBox="0 0 1200 250" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="house" x1="0" y1="0" x2="1200" y2="250" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#58a6ff"/><stop offset="0.5" stop-color="#9b8cf7"/><stop offset="1" stop-color="#ef6fd0"/>
+        </linearGradient>
+        <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="250" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#111433"/><stop offset="1" stop-color="#241a3e"/>
+        </linearGradient>
+        <linearGradient id="shim" x1="0" y1="0" x2="240" y2="0" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#ffffff" stop-opacity="0"/><stop offset="0.5" stop-color="#ffffff" stop-opacity="0.14"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+        </linearGradient>
+        <linearGradient id="fade" x1="0" y1="0" x2="760" y2="0" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#0f1230" stop-opacity="0.92"/><stop offset="0.62" stop-color="#0f1230" stop-opacity="0.72"/><stop offset="1" stop-color="#0f1230" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <rect width="1200" height="250" fill="url(#bg)"/>
+      <g id="lattice"></g>
+      <g class="sweep"><rect x="0" y="0" width="240" height="250" fill="url(#shim)"/></g>
+      <rect width="760" height="250" fill="url(#fade)"/>
+      <text x="56" y="66" class="mono" fill="#aeb8e6" font-size="14" letter-spacing="4" style="font-weight:600">MASH ENGINE &#183; CHAIN-OF-DENSITY MAP</text>
+      <text x="53" y="140" class="mono" fill="url(#house)" font-size="62" style="font-weight:800;letter-spacing:-1px">DENSITY&#8209;TRELLIS</text>
+      <text x="56" y="180" class="mono" fill="#c7cdf0" font-size="17" style="font-weight:600">the whole engine as a branching lattice</text>
+      <text x="56" y="212" class="mono" fill="#7e86b6" font-size="13.5" letter-spacing="1">9 classes &#183; 5 density tiers &#183; essence &#8594; current &#8594; limit</text>
+    </svg>
+  </div>
+
+  <p class="lede">MASH is <b>Matthew Murphy's (Lexideck)</b> semantic-reality engine — a TinyMUSH-descended text world driven by a hardcoded+softcoded command engine that routes narrative gaps through a Gemini <b>"Loom."</b> Read through OpenCnid's Trellis engine, it is a strikingly close <b>sibling design</b>. Nine subsystem classes, each a fixed-length five-tier chain that densifies <b>essence &#8594; current machinery &#8594; frontier / limit</b>. Reverse-engineered from a read-only clone (Artistic License 2.0).</p>
+  <div class="stats">
+    <div class="stat"><b>11</b><span>classes / branches</span></div>
+    <div class="stat"><b>5</b><span>density tiers each</span></div>
+    <div class="stat"><b>203</b><span>commits read</span></div>
+    <div class="stat"><b>11</b><span>sub-agents, one per class</span></div>
+  </div>
+
+  <div class="trunk">
+    <p class="k">Trunk · T0 · what MASH is, in one sentence</p>
+    <p>MASH is a single-process, shared-memory <b>"semantic reality engine"</b> — a TinyMUSH-descended text world of rooms, objects and agents held in one JSON-backed database, driven by a hardcoded-plus-softcoded command engine that routes every sensory or narrative gap through a Gemini <b>"Loom"</b> whose bracketed output is re-parsed as commands in the <i>same</i> syntax players and softcode use.</p>
+  </div>
+
+
+  <div class="legend">
+    <div>
+      <h4>Density ramp · T1→T5</h4>
+      <div class="ramp"><i style="background:var(--t1)"></i><i style="background:var(--t2)"></i><i style="background:var(--t3)"></i><i style="background:var(--t4)"></i><i style="background:var(--t5)"></i></div>
+      <div class="ramp-lab"><span>general</span><span>future</span></div>
+    </div>
+    <div>
+      <h4>Status</h4>
+      <div class="chips">
+        <span class="chip ok">shipped / measured</span>
+        <span class="chip hold">principle · no build</span>
+        <span class="chip wip">proposed / blocked</span>
+      </div>
+    </div>
+    <div style="color:var(--ink-soft);font-size:12.5px;max-width:30ch">Click any tier to read it in full. The map is the
+      lattice; the territory — full 90-word tiers — lives in <span class="mono">docs/density-chain/DENSITY-CHAIN.md</span>.</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer>
+    <p><b>How this was reconstructed.</b> Reverse-engineered July 21, 2026 from a read-only public clone by six parallel analysis agents reading mash_engine.py, ai_layer.py, database.py, app.py and README.md; every file:line is from the clone. The clone is shallow and carries no design records or roadmap, so the T5 tiers read as limits and frontiers visible in the code, not a stated roadmap.</p>
+    <p class="mono" style="margin-top:12px;color:var(--wip)"><b style="color:var(--wip)">Sibling to Trellis:</b> both draw the same kernel/extensible-userspace line, compose prompts from state objects, and make their commands self-documenting. The difference is guards — MASH is a lower-stakes narrative engine where a model may freely author state and prompts; read through Trellis it is the <i>un-guarded twin</i>. Full analysis: SELF_DESCRIBING_SURFACES.md in the Trellis repo.</p>
+    <p class="mono" style="margin-top:10px"><b>Credit:</b> MASH is Matthew Murphy's (Mogura / Lexideck), Artistic License 2.0. Appreciation, not appropriation.</p>
+  </footer>
+</div>
+
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sh-title">
+  <div class="sheet-card">
+    <div class="sh-top">
+      <span class="badge" id="sh-badge">T1</span>
+      <div><h3 id="sh-title">—</h3><div class="cls mono" id="sh-cls">—</div></div>
+      <button class="x" id="sh-x" aria-label="Close">×</button>
+    </div>
+    <p class="full" id="sh-full">—</p>
+    <div class="meta" id="sh-meta">—</div>
+  </div>
+</div>
+
+<script>
+// ---- build the animated banner lattice ----
+(function(){
+  const g=document.getElementById('lattice');if(!g)return;
+  const NS="http://www.w3.org/2000/svg";
+  const rows=[46,96,146,190,222].slice(0,5), yTop=40,yBot=226;
+  for(let c=0;c<26;c++){
+    const x=30+c*46;
+    const ln=document.createElementNS(NS,'line');
+    ln.setAttribute('x1',x);ln.setAttribute('y1',yTop);ln.setAttribute('x2',x);ln.setAttribute('y2',yBot);
+    ln.setAttribute('stroke','url(#house)');ln.setAttribute('stroke-width','1');ln.setAttribute('opacity','0.16');
+    ln.setAttribute('class','grow');ln.style.animationDelay=(c*0.05)+'s';g.appendChild(ln);
+    for(let r=0;r<5;r++){
+      const cy=yTop+ (r*(yBot-yTop)/4);
+      const cir=document.createElementNS(NS,'circle');
+      cir.setAttribute('cx',x);cir.setAttribute('cy',cy);cir.setAttribute('r', r===0?2.2:2.6+r*0.5);
+      cir.setAttribute('fill','url(#house)');cir.setAttribute('class','node');
+      cir.style.animationDelay=((c*0.13+r*0.5)%3.4)+'s';g.appendChild(cir);
+    }
+  }
+  for(let r=0;r<5;r++){
+    const y=yTop+(r*(yBot-yTop)/4);
+    const rail=document.createElementNS(NS,'line');
+    rail.setAttribute('x1',24);rail.setAttribute('y1',y);rail.setAttribute('x2',1176);rail.setAttribute('y2',y);
+    rail.setAttribute('stroke','url(#house)');rail.setAttribute('stroke-width','0.6');rail.setAttribute('opacity','0.10');
+    g.appendChild(rail);
+  }
+})();
+
+const RAMP=["var(--t1)","var(--t2)","var(--t3)","var(--t4)","var(--t5)"];
+const PHASE=["essence","current","current","frontier","limit"];
+// each tier: [gist, statusLabel, statusClass, fullText]
+const DATA=[
+{g:"World, engine & softcode — the mutable object world and the dispatcher that drives it",cls:[
+ {id:"C1",t:"World & object model",ch:"One flat object graph, JSON-persisted — the closest MASH thing to 'the facts.'",
+  x:"C2 dispatches into it · C7 gates who may mutate it · C5 reads it via to_dict()",
+  T:[
+   ["Every room, exit, item and agent is one GameObject dataclass keyed by dbref, distinguished only by a type string, with a free-form attrs map.","core","ok","Everything in the world — a room, an exit, an item, an autonomous agent — is one GameObject dataclass distinguished only by a type string, addressed by a dbref, holding ~35 optional fields plus a free-form attrs string-map. The whole world is a single dict[dbref → GameObject] in memory."],
+   ["WorldDatabase holds one dict + name/type/location indices; load() reconstructs each object and silently drops unrecognized keys.","shipped","ok","WorldDatabase (database.py:144) holds self.objects plus name/type/location indices 'for O(1) performance'; load() (:184) JSON-parses world.json and reconstructs each object, silently dropping unrecognized keys (:202); save() (:219) dumps the entire dict."],
+   ["Persistence is whole-file, atomic via temp-file + os.replace ('Atomic swap!') — no diffing, no history; world.json is gitignored runtime state.","shipped","ok","Persistence is whole-file, atomic via temp-file + os.replace (database.py:229-241) — 'Atomic swap!' — with no diffing, no history, no per-user partition. world.json is declared runtime/secret state in .gitignore (grouped with .env, *.key), never versioned."],
+   ["to_dict() (strips empties) is the universal object→context primitive every AI call and command is built from.","distinctive","hold","to_dict() (database.py:91) strips empty fields and is the universal object→context primitive every AI call and command is built from. The one durability cadence is a 30-minute autosave plus wizard @dump/@reload (app.py:369, :483)."],
+   ["attrs is an unschema'd bag written directly by handlers; the silent field-drop on load IS the schema-drift failure a typed, custody-bearing store avoids. Last-write-wins, no provenance.","un-guarded","wip","attrs: Dict[str,str] is an unschema'd bag written directly by handlers (VR descriptions, outfit slots, body_desc); the silent field-drop on load is the schema-drift failure a typed, custody-bearing store avoids. The world is mutable game-state — last-write-wins, no provenance."]
+  ]},
+ {id:"C2",t:"Command engine & the shared wire",ch:"The 'dumb orchestrator': parse, dispatch, mutate, narrate — one command language for players, softcode, AND the AI.",
+  x:"C1 is what it mutates · C3 is its fallback · C4 documents its verbs · C5 is what it calls for narration",
+  T:[
+   ["MashEngine is 'the dumb orchestrator': it parses commands, updates state, and calls the AI layer for descriptions and NPC actions.","core","ok","MashEngine is documented as 'the dumb orchestrator — it parses commands, updates state, and calls out to the AI layer for descriptions and NPC actions' (mash_engine.py:6). It holds a commands: Dict[str,Callable] and dispatches raw input against it."],
+   ["process_command resolves shortcut prefixes and exit names, then a hardcoded-verb lookup; only on a miss does it fall through to softcode $ triggers — hardcoded strictly pre-empts softcode.","shipped","ok","process_command (mash_engine.py:552) resolves shortcut prefixes (\"/:/&), bare exit names, then a hardcoded-verb lookup; only on a miss does it fall through to scan the room for softcode $ triggers (:583-595). Hardcoded commands strictly pre-empt softcode."],
+   ["~115 methods live on one 4,527-line class (two classes total); 'subsystems' are comment-banner sections, not modules.","shipped","ok","~115 methods live on one 4,527-line class (mash_engine.py, two classes total: CommandResult :43, MashEngine :52); 'subsystems' are comment-banner sections, not modules. Commands mutate GameObject state and propagate via history / room broadcasts."],
+   ["The most distinctive move: the AI's output and player/softcode input share ONE bracket-command syntax, parsed by the same machinery. Narration IS action.","distinctive","hold","The engine's most distinctive move: the AI's output and the player/softcode input share one bracket-command syntax ([cmd args]), parsed by the same machinery (capture_robot_intent, :2576). There is no separate 'tool-calling' format — narration is action."],
+   ["The monolith has no internal decomposition or test suite; model output flows into the command parser with only regex extraction between them.","un-guarded","wip","The monolith has no internal decomposition or test suite; correctness rests on one dispatcher and a flat verb table. The elegance (one wire) is also the risk: model output flows into the command parser with only regex extraction between them."]
+  ]},
+ {id:"C3",t:"Softcode & function evaluation",ch:"User-scripted, live extensibility — the extensible half of the kernel/softcode split (TinyMUSH softcode reborn).",
+  x:"C2 falls through to it · C6 couples it to the AI loop via @agent · C1 stores triggers as attrs",
+  T:[
+   ["Any 'listening' object carries $pattern:action (command-shaped) or ^pattern:action (ambient) triggers; matched input re-enters the dispatcher AS the object.","core","ok","Any object flagged listening=True can carry attributes formatted $pattern:action (command-shaped triggers) or ^pattern:action (ambient, fire on room speech); matched input re-enters process_command as the object, not the player."],
+   ["$ shadow commands glob-match via fnmatch; ^ listen patterns fire on broadcasts; both run the stored action through function-eval + placeholder substitution first.","shipped","ok","$ shadow commands glob-match via fnmatch (mash_engine.py:780-817); ^ listen patterns fire on broadcasts (:819-842). Both run the stored action string through _evaluate_functions and _substitute_placeholders first."],
+   ["Inline [func()] calls cover rand/pick/v/get/math; %n placeholders expand %0/%!/%l/%#; { } blocks sequence commands by newline or ;.","shipped","ok","Inline [func()] calls (_evaluate_functions, :844) cover [rand()], [pick()], [v()], [get()], math; %n placeholders (_substitute_placeholders, :982) expand %0/%!/%l/%#. { } blocks sequence commands by newline or ; (README.md:132-176)."],
+   ["TinyMUSH softcode reborn: a full mini-interpreter for player-authored behavior, live the instant an &ATTR is set. @agent drops an autonomous NPC coupling softcode to the AI loop.","distinctive","hold","This is TinyMUSH softcode reborn: a full mini-interpreter for player-authored behavior, live the instant an &ATTR is set. @agent drops an autonomous NPC (:146) that couples softcode to the AI loop (C6)."],
+   ["A softcode string is gated only by object ownership — no manifest, no review, no provenance, no lifecycle. It runs forever; nothing contests it when its assumptions change.","un-guarded","wip","A softcode string is gated only by object ownership (can_modify, mash_engine.py:2361) — no manifest, no review, no provenance, no lifecycle. It runs forever until an owner edits or deletes it; nothing 'contests' it when its assumptions change."]
+  ]}
+]},
+{g:"Self-description & AI — how the engine documents itself and turns state into prompts",cls:[
+ {id:"C4",t:"Self-documenting commands & help",ch:"Building a command includes its documentation — MASH's discoverability-by-default, and the seed of Trellis's llm_help.",
+  x:"documents C2's verbs · the pattern Trellis borrows for llm_help · human-help only today",
+  T:[
+   ["MASH commands are self-documenting by construction: each registers WITH its metadata, so the engine can always answer 'what exists and how do I use it?'.","core","ok","MASH commands are self-documenting by construction: each registers with its metadata, so the engine can always answer 'what commands exist and how do I use them?' without a separate doc pass."],
+   ["command_meta: name→{help,category,aliases,usage} is populated by register_command — ONE call site binds the handler and its docs together.","shipped","ok","command_meta: name → {help, category, aliases, usage} and function_meta (mash_engine.py:67-68) are populated by register_command/register_function (:306-337) — one call site binds the handler and its docs together."],
+   ["~60 commands declared inline with their fields, grouped into 8 categories; _cmd_help auto-generates the categorized catalog and per-item/topic lookup from that registry.","shipped","ok","~60 commands are declared inline with their fields (:92-282), grouped into Movement / Senses / Communication / Economy / Building / Ownership / System / VR. _cmd_help (:1835-1927) auto-generates the categorized catalog and per-item / per-topic lookup from that registry."],
+   ["The registry serves five lookup shapes from one data structure (help, help <cmd>, <function>, <topic>, <category>) — a clean precedent for one 'alive catalog' surface.","distinctive","hold","The registry serves five lookup shapes from one data structure (help, help <cmd>, help <function>, help <topic>, help <category>) — a clean precedent for a single 'alive catalog' surface."],
+   ["Human-help ONLY — never reaches the UI or the model; and help can DRIFT from enforcement: @mind's help says '(Wizard only)' while a separate if-check enforces it, nothing binding them.","un-guarded","wip","The self-documentation is human-help only — it never reaches the UI (the sidebar is hand-coded, app.py:465) or the model (ai_layer.py has no reference to command_meta). And the help text can drift from enforcement: @mind's help reads '(Wizard only)' (:175) while the real gate is a separate if not agent.wizard check (:3272) — nothing binds them."]
+  ]},
+ {id:"C5",t:"The AI Loom surface",ch:"Where object state becomes a prompt — the Gemini layer, code-composed then model-bloomed.",
+  x:"called by C2/C6/C8 · composes prompts from C1's to_dict() context · the 'bloom' = one model composing another's prompt",
+  T:[
+   ["An AIEngine wraps Google's Gemini SDK behind named 'Looms' — persona-fixed prompt builders for narration, NPC reasoning, image prompting, VR, and research.","core","ok","An AIEngine (ai_layer.py) wraps Google's GenAI SDK (Gemini text + image) behind named 'Looms' — persona-fixed prompt builders for narration, NPC reasoning, image prompting, VR, and search-grounded research."],
+   ["A Sensory Loom is a static system_prompt prepended to every text call; each Loom code-assembles a prompt list from a context dict — no model in the composing step.","shipped","ok","A Sensory Loom (ai_layer.py:32) is a single static system_prompt prepended to every text call; each Loom method code-assembles a prompt list from a context dict (.get() + f-strings, :82-98) — no model in the composing step."],
+   ["get_ai_context is the one place engine objects become that dict, entirely via to_dict(); the Visual Loom 'converts MASH state into a high-fidelity image prompt.'","shipped","ok","get_ai_context (mash_engine.py:2500) is the one place engine objects (agent, target, room, exits, outfits) become that dict, entirely via to_dict(). The Visual Loom (ai_layer.py:334) 'converts MASH state into a high-fidelity image prompt.'"],
+   ["The 'bloom': the code-built image prompt is first sent to the TEXT model to embellish before the IMAGE model renders — one model composing another model's input.","distinctive","hold","The 'bloom' (ai_layer.py:365): the code-built image prompt is first sent to the text model to embellish it before the image model renders — one model composing another model's input. It is MASH's clearest 'each function composes the next's prompt' move."],
+   ["The bloom is UNGATED — free model text flows to the next model with no derivation check. And the seven Loom methods each duplicate their own ad-hoc prompt assembly.","un-guarded","wip","The bloom is ungated — free model text flows to the next model with no derivation or grounding check. And the seven Loom methods each duplicate their own ad-hoc prompt assembly — the same instance repeated with no shared composition primitive."]
+  ]},
+ {id:"C6",t:"Autonomous agents & the robot loop",ch:"NPCs that think in the same command language they act in.",
+  x:"C5 pointed back into the world through C2's wire · writes memory into C1 · agentic loop with zero tool schema",
+  T:[
+   ["An @agent NPC runs a loop: package its situation as context, the AI reasons, and the AI's bracketed output is re-executed as commands.","core","ok","An @agent NPC runs a loop: the engine packages its situation as context, the AI reasons, and the AI's bracketed output is re-executed as commands — the agent writes in the exact language the engine parses from players and softcode."],
+   ["process_command's tick branch calls get_robot_tick; capture_robot_intent regex-extracts [go north]/[memo …]/[status …]/[goal …] and re-dispatches each.","shipped","ok","process_command's tick branch (mash_engine.py:743) calls AIEngine.get_robot_tick (ai_layer.py:257); capture_robot_intent (mash_engine.py:2576) regex-extracts [go north], [memo …], [status …], [goal …] and re-dispatches each through process_command."],
+   ["[remember]/[memo] append straight into GameObject.memo/.status — flat strings with hard 5000/2000-char caps that force lossy 'consolidation' on overflow.","shipped","ok","[remember <text>]/[memo …] append straight into GameObject.memo/.status — flat strings with hard 5000/2000-char caps that force lossy 'consolidation' on overflow ('SYSTEM ALERT: Memory Full … perform a [memo <summary>] now', :2611)."],
+   ["Agentic behavior with ZERO tool schema: the model's 'tools' are the game's verbs, discovered from the world and the help text, exercised through the shared wire.","distinctive","hold","This is agentic behavior with zero tool schema: the model's 'tools' are the game's verbs, discovered from the world and the help text, exercised through the shared wire. It is a working end-to-end agent loop in a few hundred lines."],
+   ["The NPC memory is unbounded LLM prose written back with no provenance, dedup, or trust standing — last-write-wins, lossy on overflow. The un-guarded form of a working-memory workspace.","un-guarded","wip","The NPC memory is unbounded LLM prose written back with no provenance, deduplication, or trust standing — last-write-wins, lossy on overflow. It is the un-guarded form of a working-memory workspace."]
+  ]}
+]},
+{g:"World-building & shell — who may change the world, and the process that hosts it",cls:[
+ {id:"C7",t:"Economy, permissions & world-building",ch:"Who may change the world, and what it costs to build it.",
+  x:"gates mutation of C1 · @agent bridges to C6 · cost-scaled-to-blast-radius, live instantiation",
+  T:[
+   ["MASH is user-extensible at the content layer: players spend tokens to create rooms/objects/agents, and permission is a simple ownership/wizard check with a lock grammar.","core","ok","MASH is user-extensible at the content layer: players spend tokens to create rooms, objects, and agents, and permission is a simple ownership / wizard check with a small lock grammar."],
+   ["@dig/@create/@agent spend tokens and call db.create_object synchronously, live-instantiating into the world the same turn; is_owner/can_modify gate mutation.","shipped","ok","@dig/@create/@agent (mash_engine.py:2932-3041) spend tokens and call db.create_object synchronously, live-instantiating into the world the same turn. is_owner/can_modify (:343-354) gate mutation."],
+   ["Costs are risk-scaled: CREATE 10, DIG 50, AGENT 500 ('premium!'); locks parse a grammar (#dbref, !flag, object:, vehicle:); a token lottery seeds the economy.","shipped","ok","Costs are risk-scaled constants: COST_CREATE = 10, COST_DIG = 50, COST_AGENT = 500 ('premium!', :28). Locks parse a grammar (#dbref, !flag, object:, vehicle:). A TOKEN_DROP_TIERS lottery seeds the economy."],
+   ["Cost-scaled-to-blast-radius is a clean idea: a whole autonomous agent costs 50× an object. Building is instant and needs no review — the world grows live.","distinctive","hold","Cost-scaled-to-blast-radius is a clean idea: a whole autonomous agent costs 50× an object. Building is instant and needs no review — the world grows live."],
+   ["Doc/code drift: the README advertises @agent at 5 tokens, the code enforces 500 — the same help-vs-enforcement gap C4 shows, in the economy. No staging, no review.","un-guarded","wip","Doc and code drift: README.md:96 advertises @agent at 5 tokens, the code enforces 500 (:28, :3016) — the same help-vs-enforcement gap C4 shows, in the economy. No staging, no review, no provenance on created content."]
+  ]},
+ {id:"C8",t:"Subjective VR (the Holodeck)",ch:"Per-player realities layered over the shared world.",
+  x:"driven by C5's Architect/DM Looms · overlays stored in C1's attrs · chains via C2's [scene_change] wire",
+  T:[
+   ["In a vr_ok room, the engine hands off to AI 'Architect' and 'Dungeon-Master' Looms that generate per-player overlays — one shared room, different views per agent.","core","ok","In a vr_ok room, the engine can hand off to AI 'Architect' and 'Dungeon-Master' Looms that generate per-player overlays — one shared room, different subjective descriptions and exits per agent."],
+   ["An unrecognized command (or a failed go, a pose, a say) in a VR room calls evolve_room ('The Architect') or react_to_vr ('The Dungeon Master').","shipped","ok","An unrecognized command (or a failed go, a pose, a say) in a VR room (mash_engine.py:598-733) calls AIEngine.evolve_room ('The Architect', ai_layer.py:433) or react_to_vr ('The Dungeon Master', :495)."],
+   ["Subjective state is written to attrs['_vr_desc_<agent>'] — shadow overlay attributes on the shared room; look/exit interception renders each player their own view.","shipped","ok","Subjective state is written to loc.attrs[f'_vr_desc_{agent.dbref}'] — shadow overlay attributes on the shared room; look/exit interception (:1035-1070) renders each player their own view."],
+   ["Architect→DM can chain via a [scene_change] bracket — again the shared wire, now driving generative world evolution: the world itself model-authored per player.","distinctive","hold","Architect→DM can chain via a [scene_change] bracket — again the shared wire, now driving generative world evolution. It is the most ambitious use of the Loom: the world itself is model-authored per player."],
+   ["Overlays live in the same unschema'd attrs bag (C1's limit), keyed by dbref; there is no lifecycle or cleanup discipline recorded in the clone.","un-guarded","wip","Overlays live in the same unschema'd attrs bag (C1's limit), keyed by dbref; there is no lifecycle or cleanup discipline recorded in the clone."]
+  ]},
+ {id:"C9",t:"The Streamlit shell",ch:"One shared-memory MUSH server wearing a web app.",
+  x:"wraps the whole engine as one shared process · hand-codes the 'alive' sidebar · one WORLD_FILE for all",
+  T:[
+   ["MASH runs as a single Streamlit process holding ONE shared WorldDatabase/MashEngine singleton across all browser sessions — a classic single-process MUD server.","core","ok","MASH runs as a single Streamlit process holding one shared WorldDatabase/MashEngine singleton across all connected browser sessions — a classic single-process MUD server, not a per-session web app."],
+   ["The database and engine are @st.cache_resource singletons; per-user session state layers auth and view; a 3-second poll syncs sessions via each agent's message_buffer.","shipped","ok","get_shared_database() / the engine are @st.cache_resource singletons (app.py:183, :218); per-user Streamlit session state layers auth and view on top; a 3-second st.fragment poll (app.py:54) syncs across sessions via each agent's message_buffer."],
+   ["WORLD_FILE is resolved once; wizard wizards and the construction/outfit menus are hand-coded Streamlit UI.","shipped","ok","WORLD_FILE is resolved once (app.py:91); wizard wizards (is_wizard, handle_wizard_command, :465) and the construction / outfit menus are hand-coded Streamlit UI."],
+   ["The 'alive' sidebar — 'monitors your state and environment to surface relevant tools' — is a state-aware discoverability surface (though hand-coded, not generated from command_meta).","distinctive","hold","The 'alive' sidebar — the README's 'monitors your state and environment to surface relevant tools' — is a state-aware discoverability surface (though hand-coded, not generated from command_meta)."],
+   ["One shared mutable singleton across all users is simple but unpartitioned; concurrency rests on Streamlit's model and the whole-file save. requirements.txt lists libs no hot path uses.","un-guarded","wip","One shared mutable singleton across all users is simple but unpartitioned; concurrency safety rests on Streamlit's execution model and the whole-file save. requirements.txt (UTF-16) lists pandas/numpy/networkx that no sampled hot path uses."]
+  ]}
+]}
+];
+
+const root=document.getElementById('root');
+const GN=["World & engine","Self-description & AI","World-building & shell"];
+DATA.forEach((grp,gi)=>{
+  const sec=document.createElement('section');sec.className='group';
+  sec.innerHTML=`<div class="group-hd"><span class="n">${String(gi+1).padStart(2,'0')} / ${GN[gi]}</span><h2>${grp.g.split(' — ')[0]}</h2><span class="sub">${grp.g.split(' — ')[1]||''}</span></div>`;
+  grp.cls.forEach(c=>{
+    const b=document.createElement('div');b.className='branch';
+    let cells='';
+    c.T.forEach((tt,ti)=>{
+      const[gist,stlab,stcl,full]=tt;
+      cells+=`<button class="cell" data-c="${c.id} · ${c.t}" data-t="${ti+1}" data-full="${full.replace(/"/g,'&quot;')}" data-st="${stlab}">
+        <span class="stripe" style="background:${RAMP[ti]}"></span>
+        <span class="top"><span class="tno">T${ti+1}</span><span class="phase">${PHASE[ti]}</span></span>
+        <span class="st"><span class="chip ${stcl}">${stlab}</span></span>
+        <span class="gist">${gist}</span></button>`;
+    });
+    const note=c.n?`<div class="note">${c.n}</div>`:'';
+    b.innerHTML=`<div class="branch-hd"><span class="badge">${c.id}</span><div class="tt"><h3>${c.t}</h3><p class="charter">${c.ch}</p></div></div>
+      ${note}<div class="lattice"><div class="vine"></div>${cells}</div>
+      <div class="xl"><b>weave ·</b> ${c.x}</div>`;
+    sec.appendChild(b);
+  });
+  root.appendChild(sec);
+});
+
+const sheet=document.getElementById('sheet');
+const shBadge=document.getElementById('sh-badge'),shTitle=document.getElementById('sh-title'),
+  shCls=document.getElementById('sh-cls'),shFull=document.getElementById('sh-full'),shMeta=document.getElementById('sh-meta');
+document.addEventListener('click',e=>{
+  const cell=e.target.closest('.cell');
+  if(cell){
+    shBadge.textContent='T'+cell.dataset.t;
+    shTitle.textContent=cell.dataset.c.split(' · ')[1];
+    shCls.textContent=cell.dataset.c.split(' · ')[0]+'  ·  '+PHASE[cell.dataset.t-1];
+    shFull.textContent=cell.dataset.full;
+    shMeta.textContent='status: '+cell.dataset.st+'   ·   full fixed-length tier — see docs/density-chain/DENSITY-CHAIN.md';
+    sheet.classList.add('on');
+  }
+  if(e.target.id==='sheet'||e.target.id==='sh-x')sheet.classList.remove('on');
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')sheet.classList.remove('on');});
+</script>
