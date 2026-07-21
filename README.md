@@ -10,6 +10,8 @@ Designed to be both private and social, MASH supports solitary exploration or mu
 
 Built on the foundation of TinyMUSH, MASH functions as a **semantic reality engine**—a persistent, programmable environment where agents live, remember, and interact. It exists to bridge the gap between static text and living worlds.
 
+> **📊 Architecture map (OpenCnid fork).** A chain-of-density *density-trellis* of the whole engine — one trunk + 9 subsystem-class branches, reverse-engineered from the code — lives at [`docs/density-chain/`](docs/density-chain/) (`DENSITY-CHAIN.md` plus an interactive `.html` render). Produced by OpenCnid because MASH is a strikingly close *sibling design* of its [Trellis](https://github.com/OpenCnid/trellis) engine.
+
 ## Requirements
 
 To run the MASH system locally, you will need **Python 3.10+** and the following dependencies (listed in `requirements.txt`):
