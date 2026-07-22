@@ -313,8 +313,11 @@ the code*, not a stated roadmap. Every file:line is from the clone this session.
 **Trellis** engine — enough that Trellis adopted a design direction from it. Both
 draw the same **kernel / extensible-userspace** line, both compose prompts from
 **state objects**, both make commands/modules **self-documenting**, and both hold
-long-lived state as an in-memory object graph flushed to JSON. The difference is
-**stakes and guards**: MASH is a lower-stakes narrative engine where a model may
+long-lived state as an in-memory object graph flushed to JSON. MASH's author frames this as a **REPL over `world.json`**: the
+file is the *fact-workspace*, and the doubt, belief, and fact workspaces are
+variable values the loop reads and mutates. Trellis trust-grades those same REPL
+variables and adds custody to them; MASH keeps one untyped workspace where
+last-write-wins stands. The difference is **stakes and guards**: MASH is a lower-stakes narrative engine where a model may
 freely author state and prompts (the ungated "bloom," the `attrs` catch-all, the
 help-vs-enforcement drift), while Trellis is an epistemic engine that constrains
 exactly those moves (typed provenance, guard-derived explanations, pinned
