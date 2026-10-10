@@ -17,6 +17,12 @@ world.json.tmp
 /reference_tinymush/
 mash_mcp_architecture.md
 
+# Local development direction
+/MILESTONES.md
+/DIRECTION.md
+/SPEC.md
+/AGENTS.md
+
 # Python clutter
 __pycache__/
 *.pyc

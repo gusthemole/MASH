@@ -340,7 +340,7 @@ class AIEngine:
         recent_ai = context.get('recent_ai', '')
 
         prompt = (
-            f"A cinematic, high-fidelity gothic-futuristic illustration in the 'Lexideck' style.\n"
+            f"A cinematic, high-fidelity gothic-futuristic illustration in a retro anime meets HD digital 3d style.\n"
             f"SCENE: {room.get('name', 'A mysterious space')}. {room.get('desc', '')}\n"
             f"CONTENTS:\n"
         )
@@ -355,7 +355,7 @@ class AIEngine:
         prompt += (
             "\nARTISTIC STYLE: Neon highlights, deep shadows, 2k resolution, 9:16 portrait aspect ratio.\n"
             "VISUAL RULES:\n"
-            "- If players or robots spoke, include translucent dialogue bubbles above them with their text.\n"
+            "- If players or robots spoke, include contrastive, boxy-angular speech bubbles above them with their text. Use dark backgrounds, bright readable lettering, and outline colors chosen to contrast with the surrounding scene. Keep speaker tails clear and avoid covering faces or important actions.\n"
             "- Ensure characters are performing the actions mentioned in 'RECENT ACTION' or 'poses'.\n"
             "- Maintain consistent character design (Lexi is a tech-goth with neon highlights, Dexter is a sharp-eyed strategist).\n"
             "Output only the final descriptive prompt for an image generator."
@@ -369,7 +369,7 @@ class AIEngine:
             )
             return response.text.strip()
         except:
-            return f"A scene in {room.get('name')}, Lexideck style, cinematic lighting."
+            return f"A scene in {room.get('name')}, retro anime meets HD digital 3d style, cinematic lighting."
 
     def generate_image(self, prompt: str) -> Optional[bytes]:
         """Generate an image using Nano Banana Pro (gemini-3-pro-image-preview)."""
